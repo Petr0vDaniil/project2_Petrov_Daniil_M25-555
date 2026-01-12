@@ -63,3 +63,8 @@ log_time - логирование времени выполнения
 db_meta.json - метаданные таблиц
 
 data/<таблица>.json - данные таблиц
+
+## Демонстрация
+[![asciicast](https://asciinema.org/a/1234567.svg)](https://asciinema.org/a/Qf2FyCr1FKpkP0PM)
+
+
