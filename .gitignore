@@ -207,3 +207,7 @@ marimo/_lsp/
 __marimo__/
 
 .idea
+
+# Project specific
+db_meta.json
+data/

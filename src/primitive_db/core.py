@@ -1,11 +1,11 @@
 """Core database functionality."""
 
 from typing import Optional
+from pathlib import Path
 
+from src.primitive_db.constants import METADATA_FILE, VALID_TYPES, DATA_DIR
 from src.primitive_db.decorators import confirm_action, handle_db_errors, log_time
 from src.primitive_db.utils import save_metadata
-
-METADATA_FILE = "db_meta.json"
 
 
 def create_table(metadata: dict, table_name: str, columns_str: list) -> Optional[str]:
@@ -21,8 +21,7 @@ def create_table(metadata: dict, table_name: str, columns_str: list) -> Optional
     
     for col_def in columns_str:
         if ":" not in col_def:
-            return (f'Ошибка: Неправильный формат столбца "{col_def}". Используй'
-                    f' "имя:тип".')
+            return f'Ошибка: Неправильный формат столбца "{col_def}". Используй "имя:тип".'
         
         col_name, col_type = col_def.split(":", 1)
         col_name = col_name.strip()
@@ -31,9 +30,8 @@ def create_table(metadata: dict, table_name: str, columns_str: list) -> Optional
         if not col_name:
             return "Ошибка: Имя столбца не может быть пустым."
         
-        if col_type not in ("int", "str", "bool"):
-            return (f'Ошибка: Неподдерживаемый тип "{col_type}". Используй int, str'
-                    f' или bool.')
+        if col_type not in VALID_TYPES:
+            return f'Ошибка: Неподдерживаемый тип "{col_type}". Используй int, str или bool.'
         
         if col_name == "ID":
             return 'Ошибка: Столбец "ID" зарезервирован.'
@@ -47,12 +45,18 @@ def create_table(metadata: dict, table_name: str, columns_str: list) -> Optional
 
 @confirm_action("удаление таблицы")
 def drop_table(metadata: dict, table_name: str) -> Optional[str]:
-    """Drop a table."""
+    """Drop a table and remove its data file."""
     if table_name not in metadata:
         return f'Ошибка: Таблица "{table_name}" не существует.'
-    
+
     del metadata[table_name]
     save_metadata(METADATA_FILE, metadata)
+
+    # Delete data file
+    data_file = Path(DATA_DIR) / f"{table_name}.json"
+    if data_file.exists():
+        data_file.unlink()
+
     return None
 
 
@@ -160,8 +164,6 @@ def delete(
     where_clause: dict,
 ) -> tuple[list, Optional[str]]:
     """Delete records from table data."""
-    len(table_data)
-    
     filtered_data = []
     for record in table_data:
         match = True
