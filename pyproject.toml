@@ -16,7 +16,7 @@ prompt = "^0.4.1"
 ruff = "^0.14.11"
 
 [tool.poetry.scripts]
-project = "src.primitive_db.main:main"
+database = "src.primitive_db.main:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

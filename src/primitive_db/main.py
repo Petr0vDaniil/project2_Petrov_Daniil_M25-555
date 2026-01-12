@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Entry point for the primitive_db application."""
 
-from src.primitive_db.engine import welcome
+from src.primitive_db.engine import run
 
 
 def main() -> None:
     """Main entry point of the application."""
-    welcome()
+    run()
 
 
 if __name__ == "__main__":
