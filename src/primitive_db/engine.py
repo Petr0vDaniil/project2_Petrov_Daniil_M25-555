@@ -76,7 +76,6 @@ def run() -> None:
         
         command = args[0].lower()
         
-        # ===== Управление таблицами =====
         if command == "exit":
             print("До свидания!")
             break
@@ -99,7 +98,8 @@ def run() -> None:
                 col_display = ", ".join(
                     f"{k}:{v}" for k, v in metadata[table_name].items()
                 )
-                print(f'Таблица "{table_name}" успешно создана со столбцами: {col_display}')
+                print(f'Таблица "{table_name}" успешно создана со столбцами:'
+                      f' {col_display}')
         
         elif command == "list_tables":
             tables = list(metadata.keys())
@@ -115,9 +115,15 @@ def run() -> None:
                 continue
             
             table_name = args[1]
-            error = core.drop_table(metadata, table_name)
-            if error:
-                print(error)
+            result = core.drop_table(metadata, table_name)
+            if isinstance(result, tuple):
+                _, error = result
+                if error:
+                    print(error)
+                else:
+                    print(f'Таблица "{table_name}" успешно удалена.')
+            elif result:
+                print(result)
             else:
                 print(f'Таблица "{table_name}" успешно удалена.')
         
@@ -135,16 +141,17 @@ def run() -> None:
             else:
                 print(info)
         
-        # ===== CRUD операции =====
         elif command == "insert":
             if len(args) < 4 or args[1].lower() != "into":
-                print("Синтаксис: insert into <таблица> values (<значение1>, <значение2>, ...)")
+                print("Синтаксис: insert into <таблица> values (<значение1>,"
+                      " <значение2>, ...)")
                 continue
             
             table_name = args[2]
             
             if args[3].lower() != "values":
-                print("Синтаксис: insert into <таблица> values (<значение1>, <значение2>, ...)")
+                print("Синтаксис: insert into <таблица> values (<значение1>,"
+                      " <значение2>, ...)")
                 continue
             
             values_str = " ".join(args[4:])
@@ -155,14 +162,17 @@ def run() -> None:
                 continue
             
             table_data = load_table_data(table_name)
-            table_data, error = core.insert(metadata, table_name, values, table_data)
+            result = core.insert(metadata, table_name, values, table_data)
             
-            if error:
-                print(error)
-            else:
-                last_id = table_data[-1]["ID"]
-                print(f'Запись с ID={last_id} успешно добавлена в таблицу "{table_name}".')
-                save_table_data(table_name, table_data)
+            if isinstance(result, tuple):
+                table_data, error = result
+                if error:
+                    print(error)
+                else:
+                    last_id = table_data[-1]["ID"]
+                    print(f'Запись с ID={last_id} успешно добавлена в таблицу'
+                          f' "{table_name}".')
+                    save_table_data(table_name, table_data)
         
         elif command == "select":
             if len(args) < 3 or args[1].lower() != "from":
@@ -177,7 +187,8 @@ def run() -> None:
                 where_clause = parser.parse_where_clause(where_str)
                 
                 if where_clause is None:
-                    print("Ошибка: некорректное условие WHERE. Формат: column = value")
+                    print("Ошибка: некорректное условие WHERE. Формат: column"
+                          " = value")
                     continue
             
             if table_name not in metadata:
@@ -185,18 +196,28 @@ def run() -> None:
                 continue
             
             table_data = load_table_data(table_name)
-            selected = core.select(table_data, where_clause)
-            _print_table(metadata[table_name], selected)
+            result = core.select(table_data, where_clause)
+            
+            if isinstance(result, tuple):
+                selected, error = result
+                if error:
+                    print(error)
+                else:
+                    _print_table(metadata[table_name], selected)
+            else:
+                _print_table(metadata[table_name], result)
         
         elif command == "update":
             if len(args) < 4:
-                print("Синтаксис: update <таблица> set <столбец> = <значение> where <условие>")
+                print("Синтаксис: update <таблица> set <столбец> = <значение>"
+                      " where <условие>")
                 continue
             
             table_name = args[1]
             
             if args[2].lower() != "set":
-                print("Синтаксис: update <таблица> set <столбец> = <значение> where <условие>")
+                print("Синтаксис: update <таблица> set <столбец> = <значение>"
+                      " where <условие>")
                 continue
             
             where_idx = None
@@ -224,15 +245,20 @@ def run() -> None:
                 continue
             
             table_data = load_table_data(table_name)
-            table_data, error = core.update(table_data, set_clause, where_clause)
+            result = core.update(table_data, set_clause, where_clause)
             
-            if error:
-                print(error)
-            else:
-                matching = core.select(table_data, where_clause)
-                for record in matching:
-                    print(f'Запись с ID={record["ID"]} в таблице "{table_name}" успешно обновлена.')
-                save_table_data(table_name, table_data)
+            if isinstance(result, tuple):
+                table_data, error = result
+                if error:
+                    print(error)
+                else:
+                    matching = core.select(table_data, where_clause)
+                    if isinstance(matching, tuple):
+                        matching, _ = matching
+                    for record in matching:
+                        print(f'Запись с ID={record["ID"]} в таблице "{table_name}"'
+                              f' успешно обновлена.')
+                    save_table_data(table_name, table_data)
         
         elif command == "delete":
             if len(args) < 4 or args[1].lower() != "from":
@@ -258,14 +284,20 @@ def run() -> None:
             
             table_data = load_table_data(table_name)
             to_delete = core.select(table_data, where_clause)
-            table_data, error = core.delete(table_data, where_clause)
+            if isinstance(to_delete, tuple):
+                to_delete, _ = to_delete
             
-            if error:
-                print(error)
-            else:
-                for record in to_delete:
-                    print(f'Запись с ID={record["ID"]} успешно удалена из таблицы "{table_name}".')
-                save_table_data(table_name, table_data)
+            result = core.delete(table_data, where_clause)
+            
+            if isinstance(result, tuple):
+                table_data, error = result
+                if error:
+                    print(error)
+                else:
+                    for record in to_delete:
+                        print(f'Запись с ID={record["ID"]} успешно удалена из'
+                              f' таблицы "{table_name}".')
+                    save_table_data(table_name, table_data)
         
         else:
             print(f"Функции {command} нет. Попробуйте снова.")

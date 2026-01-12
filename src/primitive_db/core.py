@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from src.primitive_db.decorators import confirm_action, handle_db_errors, log_time
 from src.primitive_db.utils import save_metadata
 
 METADATA_FILE = "db_meta.json"
@@ -20,7 +21,8 @@ def create_table(metadata: dict, table_name: str, columns_str: list) -> Optional
     
     for col_def in columns_str:
         if ":" not in col_def:
-            return f'Ошибка: Неправильный формат столбца "{col_def}". Используй "имя:тип".'
+            return (f'Ошибка: Неправильный формат столбца "{col_def}". Используй'
+                    f' "имя:тип".')
         
         col_name, col_type = col_def.split(":", 1)
         col_name = col_name.strip()
@@ -30,7 +32,8 @@ def create_table(metadata: dict, table_name: str, columns_str: list) -> Optional
             return "Ошибка: Имя столбца не может быть пустым."
         
         if col_type not in ("int", "str", "bool"):
-            return f'Ошибка: Неподдерживаемый тип "{col_type}". Используй int, str или bool.'
+            return (f'Ошибка: Неподдерживаемый тип "{col_type}". Используй int, str'
+                    f' или bool.')
         
         if col_name == "ID":
             return 'Ошибка: Столбец "ID" зарезервирован.'
@@ -42,6 +45,7 @@ def create_table(metadata: dict, table_name: str, columns_str: list) -> Optional
     return None
 
 
+@confirm_action("удаление таблицы")
 def drop_table(metadata: dict, table_name: str) -> Optional[str]:
     """Drop a table."""
     if table_name not in metadata:
@@ -63,6 +67,8 @@ def validate_table_name(table_name: str) -> Optional[str]:
     return None
 
 
+@handle_db_errors
+@log_time
 def insert(
     metadata: dict,
     table_name: str,
@@ -71,15 +77,14 @@ def insert(
 ) -> tuple[list, Optional[str]]:
     """Insert a new record into a table."""
     if table_name not in metadata:
-        return table_data, f'Ошибка: Таблица "{table_name}" не существует.'
+        raise KeyError(f'Таблица "{table_name}" не существует.')
     
     table_columns = metadata[table_name]
     expected_count = len(table_columns) - 1
     
     if len(values) != expected_count:
-        return (
-            table_data,
-            f"Ошибка: ожидается {expected_count} значений, получено {len(values)}.",
+        raise ValueError(
+            f"Ожидается {expected_count} значений, получено {len(values)}."
         )
     
     column_names = [k for k in table_columns.keys() if k != "ID"]
@@ -88,7 +93,7 @@ def insert(
     for value, expected_type in zip(values, column_types):
         error = _validate_value_type(value, expected_type)
         if error:
-            return table_data, error
+            raise ValueError(error)
     
     if table_data:
         new_id = max(record["ID"] for record in table_data) + 1
@@ -103,6 +108,8 @@ def insert(
     return table_data, None
 
 
+@handle_db_errors
+@log_time
 def select(
     table_data: list,
     where_clause: Optional[dict] = None,
@@ -124,6 +131,7 @@ def select(
     return result
 
 
+@handle_db_errors
 def update(
     table_data: list,
     set_clause: dict,
@@ -145,12 +153,14 @@ def update(
     return table_data, None
 
 
+@confirm_action("удаление записей")
+@handle_db_errors
 def delete(
     table_data: list,
     where_clause: dict,
 ) -> tuple[list, Optional[str]]:
     """Delete records from table data."""
-    initial_count = len(table_data)
+    len(table_data)
     
     filtered_data = []
     for record in table_data:
